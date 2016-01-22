@@ -10,6 +10,7 @@
 // Author: Daniel Jose Viana, danjovic@hotmail.com
 //
 // Version 0.6 - January, 2016 - Basic Release
+// Version 0.7 - January, 2016 - Bug correction to work with GTA
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -30,6 +31,42 @@
 uint8_t ticks=0;
 uint8_t lastkey=0;
 uint8_t temp,key;
+uchar   reportBuffer[2];
+
+
+////////////////////////////////////////////////////////////////////////////////
+//    ___             _   _
+//   | __|  _ _ _  __| |_(_)___ _ _  ___
+//   | _| || | ' \/ _|  _| / _ \ ' \(_-<
+//   |_| \_,_|_||_\__|\__|_\___/_||_/__/
+//
+
+// Send a key press to the host but don't send a key up
+void sendKeyStroke_nostop(byte keyStroke, byte modifiers) {
+  while (!usbInterruptIsReady()) {
+    usbPoll();
+    _delay_ms(5);
+  }
+  memset(reportBuffer, 0, sizeof(reportBuffer));
+  reportBuffer[0] = modifiers;
+  reportBuffer[1] = keyStroke;
+  usbSetInterrupt(reportBuffer, sizeof(reportBuffer));
+  while (!usbInterruptIsReady()) {
+    usbPoll();
+    _delay_ms(5);
+  }
+}
+
+// Print a string to the host, and add a key up after a delay 
+void DigiKeyboard_print ( char *str ) {
+  uint8_t data;
+  while (*str) {
+    data = pgm_read_byte_near(ascii_to_scan_code_table + (*str++ - 8));
+    sendKeyStroke_nostop(data & 0b01111111, data >> 7 ? MOD_SHIFT_RIGHT : 0);
+    DigiKeyboard.delay(50);
+    sendKeyStroke_nostop(0,0);
+  }
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -79,16 +116,16 @@ void loop() {
       if (temp >10 ) {      // 10 * 10ms = 100ms debounce time
           DigiKeyboard.sendKeyStroke(0);
           switch (lastkey) {                                    // Cheats for GTA San Andreas
-            case 1:  DigiKeyboard.print("hesoyam");   break;    // key 1  Restore Health and Give Money
-            case 2:  DigiKeyboard.print("ASNAEB");    break;    // key 2  Clear Wanted Level
-            case 3:  DigiKeyboard.print("ROCKETMAN"); break;    // key 3  Have Jetpack
-            case 4:  DigiKeyboard.print("OHDUDE");    break;    // key 4  Spawn Helicopter
-            case 5:  DigiKeyboard.print("LXGIWYL");   break;    // key 5  Weapon Set 1
-            case 6:  DigiKeyboard.print("KJKSZPJ");   break;    // key 6  Weapon Set 2
-            case 7:  DigiKeyboard.print("UZUMYMW");   break;    // key 7  Weapon Set 3
-            } // case
-        } // key release after 100ms     
-      } // key release
+            case 1:  DigiKeyboard_print("hesoyam\0");   break;    // key 1  Restore Health and Give Money
+            case 2:  DigiKeyboard_print("asnaeb\0");    break;    // key 2  Clear Wanted Level
+            case 3:  DigiKeyboard_print("rocketman\0"); break;    // key 3  Have Jetpack
+            case 4:  DigiKeyboard_print("ohdude\0");    break;    // key 4  Spawn Helicopter
+            case 5:  DigiKeyboard_print("LXGIWYL\0");   break;    // key 5  Weapon Set 1
+            case 6:  DigiKeyboard_print("KJKSZPJ\0");   break;    // key 6  Weapon Set 2
+            case 7:  DigiKeyboard_print("UZUMYMW\0");   break;    // key 7  Weapon Set 3
+          } // case
+      } // key release after 100ms     
+    } // key release
   // cycle each 10ms
   DigiKeyboard.delay(10);
 }
